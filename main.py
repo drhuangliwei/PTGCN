@@ -129,7 +129,7 @@ if __name__=='__main__':
     device = torch.device(device_string)
 
     print("loading the dataset...")
-    ratings, train_data, valid_data, test_data = data_partition('data/movielens/ml-1m')
+    ratings, train_data, valid_data, test_data = data_partition('ml-1m')
 
     users = ratings['user_id'].unique()
     items = ratings['item_id'].unique() 

@@ -172,4 +172,4 @@ def data_partition(fname):
     return ratings, train_data, valid_data, test_data
 
 if __name__ == '__main__':
-    ratings, train_data, valid_data, test_data = data_partition('data/movielens/ml-1m')
+    ratings, train_data, valid_data, test_data = data_partition('ml-1m')
