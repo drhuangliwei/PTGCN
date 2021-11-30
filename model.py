@@ -29,8 +29,10 @@ class PTGCN(nn.Module):
     
         self.user_embeddings = nn.Embedding(self.num_users, self.embedding_dimension)
         self.item_embeddings = nn.Embedding(self.num_items, self.embedding_dimension)
+        self.time_embeddings = nn.Embedding(20, self.embedding_dimension)
         nn.init.normal_(self.user_embeddings.weight, std=0.1)
         nn.init.normal_(self.item_embeddings.weight, std=0.1)
+        nn.init.normal_(self.time_embeddings.weight, std=0.1)
         
         self.user_neig50, self.user_egdes50, self.user_neig_time50, self.user_neig_mask50 = user_neig50
         self.item_neig50, self.item_egdes50, self.item_neig_time50, self.item_neig_mask50 = item_neig50
@@ -52,14 +54,19 @@ class PTGCN(nn.Module):
         curr_layers [scalar]: number of temporal convolutional layers to stack.
         num_neighbors [scalar]: number of temporal neighbor to consider in each convolutional layer.
         """
-        assert (n_layers >= 0)
+        #assert (n_layers >= 0)
+        device = nodes.device
+
         n_neighbor = self.n_neighbors[n_layers-1]
         nodes_torch = nodes.long()
         edges_torch = edges.long()
         timestamps_torch = timestamps.long()
+        
+        #inx = torch.arange(0,20).to(device)
 
         # query node always has the start time -> time span == 0
-        nodes_time_embedding = self.time_encoder(torch.zeros_like(timestamps_torch))
+        #nodes_time_embedding = torch.matmul(self.time_encoder(torch.zeros_like(timestamps_torch)),self.time_embeddings(inx)).unsqueeze(1)
+        nodes_time_embedding = self.time_embeddings(self.time_encoder(torch.zeros_like(timestamps_torch)))
         if nodetype=='user':
             node_features = self.user_embeddings(nodes_torch)
         else:
@@ -79,7 +86,8 @@ class PTGCN(nn.Module):
 
                 neighbor_embeddings = self.compute_embedding(adj, adge, times, n_layers - 1, 'item')
                 neighbor_embeddings = neighbor_embeddings.view(len(nodes), n_neighbor, -1)
-                edge_time_embeddings = self.time_encoder(edge_deltas.flatten())
+                edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                #edge_time_embeddings = torch.matmul(self.time_encoder(edge_deltas.flatten()),self.time_embeddings(inx))
                 edge_time_embeddings = edge_time_embeddings.view(len(nodes), n_neighbor, -1)
 
                 node_embedding,_  = self.attention_models[n_layers - 1](node_features,
@@ -99,7 +107,8 @@ class PTGCN(nn.Module):
                 
                 neighbor_embeddings = self.compute_embedding(adj, adge, times, n_layers - 1, 'user')
                 neighbor_embeddings = neighbor_embeddings.view(len(nodes), n_neighbor, -1)
-                edge_time_embeddings = self.time_encoder(edge_deltas.flatten())
+                edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                #edge_time_embeddings = torch.matmul(self.time_encoder(edge_deltas.flatten()),self.time_embeddings(inx))
                 edge_time_embeddings = edge_time_embeddings.view(len(nodes), n_neighbor, -1)
 
                 node_embedding,_ = self.attention_models[n_layers - 1](node_features,

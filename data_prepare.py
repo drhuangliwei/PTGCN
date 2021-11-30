@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Nov 17 15:33:01 2020
 
@@ -116,7 +115,6 @@ class NeighborFinder:
 
 def data_partition(fname):
     
-    # read ratings
     ratings = []
     with open(os.path.join(fname, 'ratings.dat')) as f:
         for l in f:
@@ -128,8 +126,42 @@ def data_partition(fname):
                     'timestamp': timestamp,
                     })
     ratings = pd.DataFrame(ratings)
+    users = ratings['user_id'].unique()
+    items = ratings['item_id'].unique()  
+     
+    ratings['timestamp'] = ratings['timestamp'] - min(ratings['timestamp'])
+    
+    for i in range(1000):
+        item_count = ratings['item_id'].value_counts()
+        item_count.name = 'item_count'
+        ratings = ratings.join(item_count, on='item_id')
 
-    ratings['timestamp'] = ratings['timestamp'] - min(ratings['timestamp'])   
+        user_count = ratings['user_id'].value_counts()
+        user_count.name = 'user_count'
+        ratings = ratings.join(user_count, on='user_id')
+        ratings = ratings[(ratings['user_count'] >= 5) & (ratings['item_count'] >= 5)]
+
+        if len(ratings['user_id'].unique()) == len(users) and len(ratings['item_id'].unique()) == len(items):
+            break
+        users = ratings['user_id'].unique()
+        items = ratings['item_id'].unique()
+        del ratings['user_count']
+        del ratings['item_count']
+    
+    del ratings['user_count']
+    del ratings['item_count']
+    
+    users = ratings['user_id'].unique()
+    items = ratings['item_id'].unique()
+    
+    item_count = ratings['item_id'].value_counts()
+    item_count.name = 'item_count'
+    ratings = ratings.join(item_count, on='item_id')
+
+    user_count = ratings['user_id'].value_counts()
+    user_count.name = 'user_count'
+    ratings = ratings.join(user_count, on='user_id')
+    ratings = ratings[(ratings['user_count'] >=5) & (ratings['item_count'] >= 5)]
 
     users = ratings['user_id'].unique()
     items = ratings['item_id'].unique()
@@ -167,9 +199,12 @@ def data_partition(fname):
     train_data, valid_data, test_data = full_data[0:offset1], full_data[offset1:offset2], full_data[offset2:len(full_data)]
    
     del ratings['rating']
+    del ratings['user_count']
+    del ratings['item_count']
     print(ratings.columns)
     
     return ratings, train_data, valid_data, test_data
 
 if __name__ == '__main__':
-    ratings, train_data, valid_data, test_data = data_partition('ml-1m')
+    ratings, train_data, valid_data, test_data = data_partition('data/movielens/ml-1m')
+

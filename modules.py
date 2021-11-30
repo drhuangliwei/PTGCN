@@ -37,26 +37,46 @@ class PositionalEncoding(nn.Module):
 
 class TimeEncode(torch.nn.Module):
   # Time Encoding proposed by TGAT
-  def __init__(self, dimension):
+  def __init__(self, H):
     super(TimeEncode, self).__init__()
 
-    self.dimension = dimension
-    self.w = torch.nn.Linear(1, dimension)
-
-    self.w.weight = torch.nn.Parameter((torch.from_numpy(1 / 10 ** np.linspace(0, 9, dimension)))
-                                       .float().reshape(dimension, -1))
-    self.w.bias = torch.nn.Parameter(torch.zeros(dimension).float())
-
+    self.H = H
+    self.w = torch.nn.Linear(1, H)
+    self.em = torch.nn.Linear(H, H)
+    self.act = torch.nn.LeakyReLU()
+    self.soft = nn.Softmax(dim=1)
+    
   def forward(self, t):
     # t has shape [batch_size, seq_len]
     # Add dimension at the end to apply linear layer --> [batch_size, seq_len, 1]
-    t = t.unsqueeze(dim=1).unsqueeze(dim=2)
-
-    # output has shape [batch_size, seq_len, dimension]
-    t = t.float()
-    output = torch.cos(self.w(t))
-
+    t = t.unsqueeze(1)
+    output1 = self.w(t.float())
+    output2 = self.act(output1)
+    output = self.em(output2) + output2
+    output = self.soft(output)
+    #output = output.unsqueeze(1)
+    
     return output
+
+class time_encoding(nn.Module):
+    # Time Encoding proposed by TGAT
+  def __init__(self, dimension):
+    super(time_encoding, self).__init__()
+
+    gap=np.array([2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768,65536,131072,262144,524288]) #20个等级
+    self.gap = torch.from_numpy(gap)
+    self.gap = self.gap
+    
+  def forward(self, t):
+    
+    device = t.device
+    gap = self.gap.to(device)
+    t = t//600
+    x = t.shape
+    t = t.unsqueeze(1).expand(x[0],gap.shape[0])
+    output = torch.sum((t>gap),1).unsqueeze(1)
+               
+    return output 
 
 class MergeLayer(torch.nn.Module):
   def __init__(self, dim1, dim2, dim3, dim4):

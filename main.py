@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 
 from data_prepare import data_partition,NeighborFinder
 from model import PTGCN
-from modules import TimeEncode,MergeLayer
+from modules import TimeEncode,MergeLayer,time_encoding
 
 class Config(object):
     """config."""
@@ -21,9 +21,9 @@ class Config(object):
     n_degree = [20,50]  #'Number of neighbors to sample'
     n_head = 4  #'Number of heads used in attention layer'
     n_epoch = 50 #'Number of epochs'
-    n_layer = 1 #'Number of network layers'
+    n_layer = 2 #'Number of network layers'
     lr = 0.0001  #'Learning rate'
-    patience = 15  #'Patience for early stopping'
+    patience = 25  #'Patience for early stopping'
     drop_out = 0.1  #'Dropout probability'
     gpu = 0,  #'Idx for the gpu to use'
     node_dim = 160  #'Dimensions of the node embedding'
@@ -46,8 +46,8 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
         model = model.eval()
         
         for ix,batch in enumerate(dl):
-            if ix%100==0:
-                print('batch:',ix)
+            #if ix%100==0:
+               # print('batch:',ix)
             count = len(batch)
             num_sample = num_sample + count
             b_user_edge = find_latest_1D(np.array(ratings.iloc[batch]['user_id']), adj_user_edge, adj_user_time, ratings.iloc[batch]['timestamp'].tolist())
@@ -71,7 +71,7 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
             itemset_embeddings = model(item_set.flatten(), edge_set.flatten(), timestamps_set.flatten(), config.n_layer, nodetype='item')
             itemset_embeddings = itemset_embeddings.view(count, 101, -1)
             
-            logits = torch.bmm(user_embeddings.unsqueeze(1), itemset_embeddings.permute(0,2,1)).squeeze() # [count,101]
+            logits = torch.bmm(user_embeddings.unsqueeze(1), itemset_embeddings.permute(0,2,1)).squeeze(1) # [count,101]
             logits = -logits.cpu().numpy()
             rank = logits.argsort().argsort()[:,0]
             
@@ -129,7 +129,7 @@ if __name__=='__main__':
     device = torch.device(device_string)
 
     print("loading the dataset...")
-    ratings, train_data, valid_data, test_data = data_partition('ml-1m')
+    ratings, train_data, valid_data, test_data = data_partition('data/movielens/ml-1m')
 
     users = ratings['user_id'].unique()
     items = ratings['item_id'].unique() 
@@ -145,7 +145,7 @@ if __name__=='__main__':
     num_users = len(users)
     num_items = len(items)
     neighor_finder = NeighborFinder(ratings)
-    time_encoder = TimeEncode(config.time_dim)
+    time_encoder = time_encoding(config.time_dim)
     MLPLayer = MergeLayer(config.embed_dim, config.embed_dim, config.embed_dim, 1)
 
     a_users = np.array(ratings['user_id'])
@@ -217,14 +217,16 @@ if __name__=='__main__':
             loss.backward()
             optim.step()
             itrs += 1
-            time1 = time1 + (time.time() - time0)
-            print('time:'+str(time1 / x))
+            #time1 = time1 + (time.time() - time0)
+            #print('time:'+str(time1 / x))
 
             sum_loss = sum_loss + loss.item()
             avg_loss = sum_loss / itrs 
                    
             if id%10==0:
                 print("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(id, len(dl), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+        
+        print("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
              
             
         ### Validation
